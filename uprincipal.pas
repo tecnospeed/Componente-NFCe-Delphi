@@ -5,50 +5,59 @@ interface
 uses
   Windows, Messages, SysUtils, Variants, Classes, Graphics, Controls, Forms,
   Dialogs, ExtCtrls, StdCtrls, IniFiles, Contnrs, spdNFCeDataSets, spdNFCe,
-  ShellAPI, spdNFCeType;
+  ShellAPI, spdNFCeType,
+  ComCtrls;
 
 type
   TfrmPrincipal = class(TForm)
-    cbCertificado: TComboBox;
-    mmXml: TMemo;
-    GroupBox1: TGroupBox;
+    pgcNFCe: TPageControl;
+    tbsNfe: TTabSheet;
+    GroupBox2: TGroupBox;
+    GroupBox4: TGroupBox;
+    TabImpressao: TTabSheet;
+    gbImpressao: TGroupBox;
+    TabDemaisMetodos: TTabSheet;
+    GroupBox5: TGroupBox;
     edtUF: TLabeledEdit;
     edtCNPJ: TLabeledEdit;
     edtId: TLabeledEdit;
     edtRecibo: TLabeledEdit;
     edtProtocolo: TLabeledEdit;
-    btnLoadConfig: TButton;
-    btnIni: TButton;
-    btnStatus: TButton;
-    btnAssinar: TButton;
-    btnEnviarSincrono: TButton;
-    btnConsultarRec: TButton;
-    btnConsultarNFCe: TButton;
-    btnCancelar: TButton;
-    btnEditar: TButton;
-    btnVisualizar: TButton;
-    btnImprimir: TButton;
+    cbCertificado: TComboBox;
+    Label1: TLabel;
     btnExportar: TButton;
-    spdNFCe: TspdNFCe;
+    btnVisualizar: TButton;
+    btnEditar: TButton;
+    btnImprimir: TButton;
+    ButtonEmail: TButton;
+    btnXmlDestinatario: TButton;
+    ButtonInutilizar: TButton;
+    btnCancelar: TButton;
+    pcMensagens: TPageControl;
+    tsXML: TTabSheet;
+    mmXml: TMemo;
+    tsXMLFormatado: TTabSheet;
+    mmConsulta: TMemo;
     spdNFCeDataSets: TspdNFCeDataSets;
     dlgTx2: TOpenDialog;
-    ButtonInutilizar: TButton;
-    LabelAmbiente: TLabel;
-    ButtonEmail: TButton;
-    GroupBox3: TGroupBox;
-    btnTx2400: TButton;
-    GroupBoxConfig: TGroupBox;
-    btnSalvarConfig: TButton;
-    GroupBoxOperacoes: TGroupBox;
-    btnDS4: TButton;
-    GroupBoxOutros: TGroupBox;
-    btnEmitCancelada: TButton;
-    btnXmlDestinatario: TButton;
+    spdNFCe: TspdNFCe;
     dlgXml: TOpenDialog;
-    btnxmlDestInuti: TButton;
-    mmConsulta: TMemo;
-    Label1: TLabel;
-    Label2: TLabel;
+    Label3: TLabel;
+    edCnpjSh: TEdit;
+    Label4: TLabel;
+    edTokenSh: TEdit;
+    btnDS4: TButton;
+    btnStatus: TButton;
+    btnLoadConfig: TButton;
+    btnIni: TButton;
+    btnConsultarRec: TButton;
+    btnEnviarSincrono: TButton;
+    btnAssinar: TButton;
+    btnTx2400: TButton;
+    btnConsultarNFCe: TButton;
+    btEnviarAssincrono: TButton;
+    btEnviarNfceCancelada: TButton;
+    btImprimirNfceCancelada: TButton;
     procedure FormCreate(Sender: TObject);
     procedure cbCertificadoChange(Sender: TObject);
     procedure btnIniClick(Sender: TObject);
@@ -65,17 +74,18 @@ type
     procedure btnExportarClick(Sender: TObject);
     procedure ButtonGerarXMLDestClick(Sender: TObject);
     procedure ButtonInutilizarClick(Sender: TObject);
-    procedure Button2Click(Sender: TObject);
     procedure ButtonEmailClick(Sender: TObject);
-    procedure Button1Click(Sender: TObject);
+    procedure btEnviarAssincronoClick(Sender: TObject);
     procedure Button3Click(Sender: TObject);
     procedure Button4Click(Sender: TObject);
     procedure btnDS4Click(Sender: TObject);
     procedure btnTx2400Click(Sender: TObject);
     procedure btnSalvarConfigClick(Sender: TObject);
-    procedure btnEmitCanceladaClick(Sender: TObject);
     procedure btnXmlDestinatarioClick(Sender: TObject);
-    procedure btnxmlDestInutiClick(Sender: TObject);
+    procedure btEnviarNfceCanceladaClick(Sender: TObject);
+    procedure btImprimirNfceCanceladaClick(Sender: TObject);
+   // procedure pgcNFeChange(Sender: TObject);  //88
+   // procedure pgcNFeChange(Sender: TObject); //88
   private
     _NumeroLote : String;
     _Dir: String;
@@ -90,20 +100,30 @@ type
 
 var
   frmPrincipal: TfrmPrincipal;
+  _Ini: TIniFile;
 
 implementation
+
+uses StrUtils;
 
 {$R *.dfm}
 
 procedure TfrmPrincipal.ExibirConfiguracoes;
 begin
+  _Ini := TIniFile.Create(ExtractFilePath(ParamStr(0)) + 'nfceconfig.ini');
+
+  spdNFCe.ListarCertificados(cbCertificado.Items);
   edtUF.Text := spdNFCe.UF;
   edtCNPJ.Text := spdNFCe.CNPJ;
-  cbCertificado.Text := spdNFCe.NomeCertificado.Text;
-  if (spdNFCe.Ambiente = akProducao) then
-    LabelAmbiente.Caption := 'Produção'
+  edCnpjSh.Text       := _Ini.ReadString('NFCE', 'cnpjSh','');
+  edTokenSh.Text       := _Ini.ReadString('NFCE', 'tokenSh','');
+
+  if((edCnpjSh.Text <>'')AND(edTokenSh.Text <>''))then
+  begin
+  spdNFCe.ConfigurarSoftwareHouse(edCnpjSh.Text,edTokenSh.Text);
+  end
   else
-    LabelAmbiente.Caption := 'Homologação';
+  ShowMessage('Você deve configurar a o CNPJ e o Token da SoftwareHouse no arquivo config.ini');
 end;
 
 function TfrmPrincipal.LoadXmlDestinatario(aChaveNFe: String): WideString;
@@ -140,50 +160,52 @@ Begin
 end;
 
 procedure TfrmPrincipal.cbCertificadoChange(Sender: TObject);
-var
-  _Ini: TIniFile;
+
 begin
   _Ini := TIniFile.Create(ExtractFilePath(ParamStr(0)) + 'nfceconfig.ini');
-
   _Ini.WriteString('NFCE','NomeCertificado',cbCertificado.Text);
 end;
 
 procedure TfrmPrincipal.FormCreate(Sender: TObject);
 begin
-  spdNFCe.ConfigurarSoftwareHouse('08187168000160','');
-  frmPrincipal.Caption := 'Demo NFCe - ' + spdNFCe.Versao;
+  frmPrincipal.Caption := 'Tecnospeed NFCe - ' + spdNFCe.Versao;
+  cbCertificado.ItemIndex :=0;
   spdNFCe.DanfceSettings.ExibirDetalhamento := true;
-  spdNFCe.ListarCertificados(cbCertificado.Items);
-  spdNFCe.LoadConfig;
-  ExibirConfiguracoes;
-  if (spdNFCe.Ambiente = akProducao) then
-    LabelAmbiente.Caption := 'Produção'
-  else
-    LabelAmbiente.Caption := 'Homologação';
 end;
 
 procedure TfrmPrincipal.btnAssinarClick(Sender: TObject);
 begin
   mmXml.Text := spdNFCe.AssinarNota(mmXml.Text);
-
+  pcMensagens.ActivePage := tsXML;
 end;
 
 procedure TfrmPrincipal.btnCancelarClick(Sender: TObject);
+ var
+  justificativa : String;
+  dataEmissao   : String;
+  dataEmissao19 : String;
 begin
-  mmConsulta.Text := spdNFCe.CancelarNF(edtId.Text,edtProtocolo.Text,'Justificativa Teste de Cancelamento',
-                                    FormatDateTime('YYYY-MM-DD"T"HH:MM:SS',Now),1,'-02:00');
+  InputQuery('Justificativa','Insira uma justificativa (min 15 caracteres): ',justificativa);//solicita a justificativa
+
+  dataEmissao   := spdNFCeDataSets.Campo('dhEmi_B09').AsString;
+  dataEmissao19 := Copy(dataEmissao,0,19);//      Substring(0,19);//retira -03:00 q ficou duplicado
+
+  if (spdNFCeDataSets.Campo('dhEmi_B09').AsString <>'') then
+  mmConsulta.Text := spdNFCe.CancelarNF(edtId.Text,edtProtocolo.Text,justificativa,dataEmissao19,1,'',_NumeroLote);//cancela a NFCe
 end;
 
 procedure TfrmPrincipal.btnConsultarNFCeClick(Sender: TObject);
 begin
   mmConsulta.Text := spdNFCe.ConsultarNF(edtId.Text);
   edtProtocolo.Text := obterNroResultado(mmXml.Text, '<nProt','</nProt');
+  pcMensagens.ActivePage := tsXMLFormatado;
 end;
 
 procedure TfrmPrincipal.btnConsultarRecClick(Sender: TObject);
 begin
   mmXml.Text := spdNFCe.ConsultarRecibo(edtRecibo.Text);
-  edtProtocolo.Text := obterNroResultado(mmXml.Text, '<nProt','</nProt');
+  edtProtocolo.Text := obterNroResultado(mmConsulta.Text, '<nProt','</nProt');
+  pcMensagens.ActivePage := tsXMLFormatado;
 end;
 
 procedure TfrmPrincipal.btnDS4Click(Sender: TObject);
@@ -264,7 +286,7 @@ procedure TfrmPrincipal.btnDS4Click(Sender: TObject);
     {
     aDs.Campo('xLgr_E06').Value     := 'RUA DO CENTRO'; //Logradouro
     aDs.Campo('nro_E07').Value      := '897'; //Número
-    Ads.Campo('xCpl_E08').Value     := 'TESTE'; //Complemento
+    ads.Campo('xCpl_E08').Value     := 'TESTE'; //Complemento
     aDs.Campo('xBairro_E09').Value  := 'CENTRO'; //Bairro
     aDs.Campo('cMun_E10').Value     := '4115200'; //Código do município
     aDs.Campo('xMun_E11').Value     := 'MARINGA'; //Nome do município
@@ -275,6 +297,15 @@ procedure TfrmPrincipal.btnDS4Click(Sender: TObject);
     aDs.Campo('fone_E16').Value     := '445555555'; //Telefone
     }
     ads.Campo('indIEDest_E16a').Value := '9';
+  end;
+
+  procedure DadosDoResponsavel (aDs : TspdNFCeDataSets);
+  begin
+    aDs.Campo('CNPJ_ZD02').Value         := '12653157000103'; // Pessoa jurídica responável pela emissão
+    aDs.Campo('xContato_ZD04').value     := 'nomeTeste'; // Nome do responsável
+    aDs.Campo('email_ZD05').value        := 'teste@teste.com.br'; // Email do responsável técnico
+    aDs.Campo('fone_ZD06').value         := '44999999999'; // Telefone do responsável
+    
   end;
 
   procedure DadosDoItem400(aDs : TspdNFCeDataSets);
@@ -370,9 +401,11 @@ begin
     DadosDoItem400(spdNFCeDataSets);
     DadosTotalizadores400(spdNFCeDataSets);
     DadosPagamento400(spdNFCeDataSets);
+    DadosDoResponsavel(spdNFCeDataSets);//xxx
 
     spdNFCeDataSets.Salvar;
 
+    pcMensagens.ActivePage := tsXML;
     mmXML.Text := spdNFCeDataSets.LoteNFCe.GetText;
     edtId.Text := Copy(spdNFCeDataSets.Campo('Id_A03').AsString,4,44);
 end;
@@ -384,35 +417,11 @@ begin
   spdNFCe.EditarModeloDanfce('1', mmXml.Text);
 end;
 
-procedure TfrmPrincipal.btnEmitCanceladaClick(Sender: TObject);
-var
-  spdNFCe : TspdNFCe;
-  _loteNotas : string;
-  _arquivo : TStringList;
-begin
-  spdNFCe := TspdNFCe.Create(nil);
-  _arquivo := TStringList.Create;
-  try
-    spdNFCe.LoadConfig('C:\nfceConfig.ini');
-    {Caminho dos dois arquivos concatenados por uma vírgula}
-    _loteNotas := spdNFCe.DiretorioXmlDestinatario + edtId.Text + '-nfce.xml,' + spdNFCe.DiretorioXmlDestinatario + edtId.Text + '-caneve.xml';
-   {Caminho de um arquivo só que contém os dois XMLs separados por quebra de linha}
-  //  _loteNotas := 'C:\XmlDestinatarioECancelamento.xml';
-    {Contéudo do arquivo}
-  //  _arquivo.LoadFromFile('C:\XmlDestinatarioECancelamento.xml');      }
-  // _loteNotas := _arquivo.Text;
-    spdNFCe.ImprimirDanfce('0', _loteNotas);
-  finally
-    _arquivo.Free;
-    spdNFCe.Free;
-  end;
-
-end;
-
 procedure TfrmPrincipal.btnEnviarSincronoClick(Sender: TObject);
 begin
-  mmConsulta.Text := spdNFCe.EnviarNFSincrono('0001',mmXml.Text);
-  edtProtocolo.Text := obterNroResultado(mmXml.Text, '<nProt','</nProt');
+  mmConsulta.Text := spdNFCe.EnviarNFSincrono('0001',mmXml.Text,false);
+  edtProtocolo.Text := obterNroResultado(mmConsulta.Text, '<nProt','</nProt');
+  pcMensagens.ActivePage := tsXMLFormatado;
 end;
 
 procedure TfrmPrincipal.btnExportarClick(Sender: TObject);
@@ -426,8 +435,8 @@ procedure TfrmPrincipal.btnImprimirClick(Sender: TObject);
 begin
   if (edtId.Text <> '') then
     mmXml.Text := LoadXmlDestinatario(edtId.Text);
-  spdNFCe.DanfceSettings.InfCplMaxCol := 48;
-  spdNFCe.ImprimirDanfce('1', mmXml.Text);
+    spdNFCe.DanfceSettings.InfCplMaxCol := 50;
+    spdNFCe.ImprimirDanfce('1', mmXml.Text);
 end;
 
 procedure TfrmPrincipal.btnIniClick(Sender: TObject);
@@ -437,8 +446,8 @@ end;
 
 procedure TfrmPrincipal.btnLoadConfigClick(Sender: TObject);
 begin
-  spdNFCe.LoadConfig;
-  ExibirConfiguracoes;
+    spdNFCe.LoadConfig;
+    ExibirConfiguracoes;
 end;
 
 procedure TfrmPrincipal.btnSalvarConfigClick(Sender: TObject);
@@ -451,6 +460,7 @@ end;
 procedure TfrmPrincipal.btnStatusClick(Sender: TObject);
 begin
   mmConsulta.Text := spdNFCe.StatusDoServico;
+  pcMensagens.ActivePage := tsXMLFormatado;
 end;
 
 procedure TfrmPrincipal.btnTx2400Click(Sender: TObject);
@@ -459,6 +469,7 @@ begin
   dlgTx2.Execute;
   if dlgTx2.FileName <> '' then
     mmXml.Text := spdNFCe.ConverterLoteParaXml(dlgTx2.FileName, lkTXTDataSet, pl_009);
+  pcMensagens.ActivePage := tsXML;
 
   edtId.Text := obterNroResultado(mmXml.Text,'Id="NF','" versao="4.00"><ide');
   //dlgTx2.Free;
@@ -474,58 +485,37 @@ end;
 
 
 procedure TfrmPrincipal.btnXmlDestinatarioClick(Sender: TObject);
-   var
-      _arq: TStringList;
-      aut, canc, _lote: String;
+  var
+      _arq, _arq2: TStringList;
+      env_sinc_lot, _sit : String;
   begin
         _arq := TStringList.Create;
       dlgXml.InitialDir := ExtractFilePath(ParamStr(0)); //Abre Dialog para localizar arquivo
+      dlgXml.Filter := '.xml';
+      dlgXml.Title := 'Informe o XML autorizado de envio da pasta log (env_sinc_lot)';
       dlgXml.Execute;
       if dlgXml.FileName <> '' then
       begin
          _arq.LoadFromFile(dlgXml.FileName);
-         aut := _arq.Text; //armazena o XML lido dentro da variável aut
+         env_sinc_lot := _arq.Text; //armazena o XML autorizado de envio da pasta log
      end;
 
      _arq.Free;
      dlgXml.InitialDir := ExtractFilePath(ParamStr(0)); //Abre Dialog para localizar arquivo
+     dlgXml.Title := 'Informe o retorno do XML autorizado enviado da pasta log (_sit.xml)';
      dlgXml.Execute;
      if dlgXml.FileName <> '' then
      begin
-         _arq.LoadFromFile(dlgXml.FileName);
-         canc := _arq.Text; //armazena o XML lido dentro da variável canc
+         _arq2 := TStringList.Create;
+         _arq2.LoadFromFile(dlgXml.FileName);
+         _sit := _arq2.Text; //armazena o XML do retorno do XML autorizado enviado da pasta log
      end;
+     _arq2.Free;
 
-     _lote := aut + canc; //concatena os dois arquivos
-     spdNFCe.ImprimirDanfce('0', _lote); //solicita a impressão
+     spdNFCe.GerarXMLEnvioDestinatario(edtId.Text, env_sinc_lot, _sit, spdNFCe.DiretorioXmlDestinatario + edtId.Text+ 'Manual-nfce.xml');//gera o arquivo destinatário manualmente
+     ShowMessage('Arquivo destinatário gerado com sucesso');
   end;
 
-procedure TfrmPrincipal.btnxmlDestInutiClick(Sender: TObject);
-   var
-      _arq: TStringList;
-      env, ret, _lote: String;
-  begin
-      _arq := TStringList.Create;
-      dlgXml.InitialDir := ExtractFilePath(ParamStr(0)); //Abre Dialog para localizar arquivo
-      dlgXml.Execute;
-      if dlgXml.FileName <> '' then
-      begin
-         _arq.LoadFromFile(dlgXml.FileName);
-         env := _arq.Text; //armazena o XML lido dentro da variável aut
-     end;
-
-     _arq.Free;
-     dlgXml.InitialDir := ExtractFilePath(ParamStr(0)); //Abre Dialog para localizar arquivo
-     dlgXml.Execute;
-     if dlgXml.FileName <> '' then
-     begin
-         _arq.LoadFromFile(dlgXml.FileName);
-         ret := _arq.Text; //armazena o XML lido dentro da variável canc
-     end;
-
-     _lote := ret + env; //concatena os dois arquivos
-     mmXml.Text := spdNFCe.GerarxmlDestinatarioInutilizacao(ret,env); //solicita a impressão
-  end;
 
 procedure TfrmPrincipal.ButtonGerarXMLDestClick(Sender: TObject);
 begin
@@ -546,13 +536,7 @@ begin
   aFim             := InputBox('NFe', 'Insira o número final da faixa a ser inutilizada', '1');
   txtJustificativa := InputBox('NFe', 'Insira a justificativa (min. 15 caracteres)', 'Exemplo de inutilizacao da NFCe');
 
-  mmXml.Text := spdNFCe.InutilizarNF('', aAno, spdNFCe.CNPJ, '65', aSerie, aIni, aFim, txtJustificativa);
-end;
-
-procedure TfrmPrincipal.Button2Click(Sender: TObject);
-begin
-  mmXml.Text := spdNFCe.AssinarEPEC(mmXml.Text); 
-
+  mmConsulta.Text := spdNFCe.InutilizarNF('', aAno, spdNFCe.CNPJ, '65', aSerie, aIni, aFim, txtJustificativa);
 end;
 
 procedure TfrmPrincipal.ButtonEmailClick(Sender: TObject);
@@ -560,9 +544,11 @@ begin
   spdNFCe.EnviarNotaDestinatario(edtId.Text, '', '');
 end;
 
-procedure TfrmPrincipal.Button1Click(Sender: TObject);
+procedure TfrmPrincipal.btEnviarAssincronoClick(Sender: TObject);
 begin
-  mmXml.Text := spdNFCe.MontarEPEC('1', mmXml.Text, FormatDateTime('YYYY-mm-dd"T"HH:mm:ss',now));
+  mmConsulta.Text := spdNFCe.EnviarNF('0001',mmXml.Text,false);
+  edtRecibo.Text := obterNroResultado(mmXml.Text, '<nRec','</nRec');
+  pcMensagens.ActivePage := tsXMLFormatado;
 end;
 
 procedure TfrmPrincipal.Button3Click(Sender: TObject);
@@ -578,6 +564,20 @@ begin
   listaXml.Add(mmXML.Text);
   listaXml.SaveToFile(ExtractFilePath(ParamStr(0)) + '\Pendencencias EPEC\'
     + edtId.Text + '-pendente.xml');
+end;
+
+procedure TfrmPrincipal.btEnviarNfceCanceladaClick(Sender: TObject);
+begin
+  spdNFCe.EnviarNotaCanceladaDestinatario(edtId.Text); //primeiro deverá ser configura o email no config.ini
+  ShowMessage('Nota cancelada enviada com sucesso!');
+end;
+
+procedure TfrmPrincipal.btImprimirNfceCanceladaClick(Sender: TObject);
+var
+  lotesNotas : String;
+begin
+  lotesNotas := spdNFCe.DiretorioXmlDestinatario + '\' + edtId.Text + '-nfce.xml,' + spdNFCe.DiretorioXmlDestinatario + '\' + edtId.Text + '-caneve.xml';
+  spdNFCe.ImprimirDanfce('0',lotesNotas);
 end;
 
 end.
